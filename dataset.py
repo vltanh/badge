@@ -1,10 +1,9 @@
 import numpy as np
-import pdb
 import torch
-from torchvision import datasets
 from torch.utils.data import Dataset
+from torchvision import datasets
 from PIL import Image
-from torchvision import transforms
+
 
 def get_dataset(name, path):
     if name == 'MNIST':
@@ -16,6 +15,7 @@ def get_dataset(name, path):
     elif name == 'CIFAR10':
         return get_CIFAR10(path)
 
+
 def get_MNIST(path):
     raw_tr = datasets.MNIST(path + '/MNIST', train=True, download=True)
     raw_te = datasets.MNIST(path + '/MNIST', train=False, download=True)
@@ -25,23 +25,28 @@ def get_MNIST(path):
     Y_te = raw_te.test_labels
     return X_tr, Y_tr, X_te, Y_te
 
+
 def get_FashionMNIST(path):
-    raw_tr = datasets.FashionMNIST(path + '/FashionMNIST', train=True, download=True)
-    raw_te = datasets.FashionMNIST(path + '/FashionMNIST', train=False, download=True)
+    raw_tr = datasets.FashionMNIST(
+        path + '/FashionMNIST', train=True, download=True)
+    raw_te = datasets.FashionMNIST(
+        path + '/FashionMNIST', train=False, download=True)
     X_tr = raw_tr.train_data
     Y_tr = raw_tr.train_labels
     X_te = raw_te.test_data
     Y_te = raw_te.test_labels
     return X_tr, Y_tr, X_te, Y_te
 
+
 def get_SVHN(path):
     data_tr = datasets.SVHN(path + '/SVHN', split='train', download=True)
-    data_te = datasets.SVHN(path +'/SVHN', split='test', download=True)
+    data_te = datasets.SVHN(path + '/SVHN', split='test', download=True)
     X_tr = data_tr.data
     Y_tr = torch.from_numpy(data_tr.labels)
     X_te = data_te.data
     Y_te = torch.from_numpy(data_te.labels)
     return X_tr, Y_tr, X_te, Y_te
+
 
 def get_CIFAR10(path):
     data_tr = datasets.CIFAR10(path + '/CIFAR10', train=True, download=True)
@@ -51,7 +56,7 @@ def get_CIFAR10(path):
     X_te = data_te.data
     Y_te = torch.from_numpy(np.array(data_te.targets))
     return X_tr, Y_tr, X_te, Y_te
-    return X_tr, Y_tr, X_te, Y_te
+
 
 def get_handler(name):
     if name == 'MNIST':
@@ -64,6 +69,7 @@ def get_handler(name):
         return DataHandler3
     else:
         return DataHandler4
+
 
 class DataHandler1(Dataset):
     def __init__(self, X, Y, transform=None):
@@ -81,6 +87,7 @@ class DataHandler1(Dataset):
     def __len__(self):
         return len(self.X)
 
+
 class DataHandler2(Dataset):
     def __init__(self, X, Y, transform=None):
         self.X = X
@@ -97,6 +104,7 @@ class DataHandler2(Dataset):
     def __len__(self):
         return len(self.X)
 
+
 class DataHandler3(Dataset):
     def __init__(self, X, Y, transform=None):
         self.X = X
@@ -112,6 +120,7 @@ class DataHandler3(Dataset):
 
     def __len__(self):
         return len(self.X)
+
 
 class DataHandler4(Dataset):
     def __init__(self, X, Y, transform=None):

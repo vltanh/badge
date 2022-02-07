@@ -39,8 +39,9 @@ class VGG(nn.Module):
     def get_embedding_dim(self):
         return 512
 
+
 def test():
     net = VGG('VGG11')
-    x = torch.randn(2,3,32,32)
+    x = torch.randn(2, 3, 32, 32)
     y = net(x)
     print(y.size())
