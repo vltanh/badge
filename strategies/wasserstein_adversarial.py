@@ -5,7 +5,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from torch.autograd import grad
 
-from .strategy import Strategy
+from .strategy import BaseStrategy
 
 
 # setting gradient values
@@ -39,7 +39,7 @@ def gradient_penalty(critic, h_s, h_t):
     return gradient_penalty
 
 
-class WassersteinAdversarial(Strategy):
+class WassersteinAdversarial(BaseStrategy):
     def __init__(self, X, Y, idx_lb, net_fea, net_clf, net_dis, train_handler, test_handler, args):
         """
         :param X:

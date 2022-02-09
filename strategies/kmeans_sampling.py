@@ -1,8 +1,8 @@
 import numpy as np
-from .strategy import Strategy
+from .strategy import BaseStrategy
 from sklearn.cluster import KMeans
 
-class KMeansSampling(Strategy):
+class KMeansSampling(BaseStrategy):
 	def __init__(self, X, Y, idxs_lb, net, handler, args):
 		super(KMeansSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
 

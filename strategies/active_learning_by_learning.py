@@ -1,8 +1,8 @@
 import numpy as np
-from .strategy import Strategy
+from .strategy import BaseStrategy
 from .random_sampling import RandomSampling
 
-class ActiveLearningByLearning(Strategy):
+class ActiveLearningByLearning(BaseStrategy):
 	def __init__(self, X, Y, idxs_lb, net, handler, args, strategy_list, delta = 0.1):
 		super(ActiveLearningByLearning, self).__init__(X, Y, idxs_lb, net, handler, args)
 		self.strategy_list = strategy_list

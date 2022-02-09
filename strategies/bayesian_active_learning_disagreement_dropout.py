@@ -1,8 +1,8 @@
 import numpy as np
 import torch
-from .strategy import Strategy
+from .strategy import BaseStrategy
 
-class BALDDropout(Strategy):
+class BALDDropout(BaseStrategy):
 	def __init__(self, X, Y, idxs_lb, net, handler, args, n_drop=10):
 		super(BALDDropout, self).__init__(X, Y, idxs_lb, net, handler, args)
 		self.n_drop = n_drop

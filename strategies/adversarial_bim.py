@@ -1,9 +1,9 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-from .strategy import Strategy
+from .strategy import BaseStrategy
 
-class AdversarialBIM(Strategy):
+class AdversarialBIM(BaseStrategy):
 	def __init__(self, X, Y, idxs_lb, net, handler, args, eps=0.05):
 		super(AdversarialBIM, self).__init__(X, Y, idxs_lb, net, handler, args)
 		self.eps = eps

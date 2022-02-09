@@ -1,5 +1,5 @@
 import numpy as np
-from .strategy import Strategy
+from .strategy import BaseStrategy
 
 
 def gram_red(L, L_inv, u_loc):
@@ -74,10 +74,9 @@ def sample_k_imp(Phi, k, max_iter, rng=np.random):
     return Ind
 
 
-class BaselineSampling(Strategy):
-    def __init__(self, X, Y, idxs_lb, net, handler, args):
-        super(BaselineSampling, self).__init__(
-            X, Y, idxs_lb, net, handler, args)
+class BaselineSampling(BaseStrategy):
+    def __init__(self, X, Y, net, handler, args):
+        super().__init__(X, Y, net, handler, args)
 
     def query(self, n):
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]

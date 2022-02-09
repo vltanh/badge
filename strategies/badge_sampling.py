@@ -1,6 +1,6 @@
 import numpy as np
 
-from .strategy import Strategy
+from .strategy import BaseStrategy
 
 
 def init_centers(X, K):
@@ -23,7 +23,7 @@ def init_centers(X, K):
     return indsAll
 
 
-class BadgeSampling(Strategy):
+class BadgeSampling(BaseStrategy):
     def __init__(self, X, Y, net, handler, args):
         super().__init__(X, Y, net, handler, args)
 

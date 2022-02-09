@@ -1,6 +1,5 @@
 import numpy as np
 import torch
-from torch import nn
 from torch.nn import functional as F
 from torch import optim
 from torch.autograd import Variable
@@ -9,7 +8,7 @@ from torch.utils.data import DataLoader
 from copy import deepcopy
 
 
-class Strategy:
+class BaseStrategy:
     def __init__(self, X, Y, net, handler, args):
         self.X = X
         self.Y = Y
@@ -39,12 +38,6 @@ class Strategy:
             loss = F.cross_entropy(out, y)
             accFinal += (torch.max(out, 1)[1] == y).sum().detach().item()
             loss.backward()
-
-            # clamp gradients, just in case
-            for p in filter(lambda p: p.grad is not None,
-                            clf.parameters()):
-                p.grad.data.clamp_(min=-.1, max=.1)
-
             optimizer.step()
         return accFinal / len(loader_tr.dataset.X)
 

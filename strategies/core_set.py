@@ -1,12 +1,12 @@
 import numpy as np
 import pdb
-from .strategy import Strategy
+from .strategy import BaseStrategy
 from sklearn.neighbors import NearestNeighbors
 import pickle
 from datetime import datetime
 from sklearn.metrics import pairwise_distances
 
-class CoreSet(Strategy):
+class CoreSet(BaseStrategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args, tor=1e-4):
         super(CoreSet, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.tor = tor

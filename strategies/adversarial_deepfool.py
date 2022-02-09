@@ -1,10 +1,10 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-from .strategy import Strategy
+from .strategy import BaseStrategy
 from torch.autograd import Variable
 import pdb
-class AdversarialDeepFool(Strategy):
+class AdversarialDeepFool(BaseStrategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args, max_iter=50):
         super(AdversarialDeepFool, self).__init__(X, Y, idxs_lb, net, handler, args)
         self.max_iter = max_iter

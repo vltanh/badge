@@ -1,8 +1,8 @@
 import numpy as np
-from .strategy import Strategy
+from .strategy import BaseStrategy
 import pdb
 
-class MarginSampling(Strategy):
+class MarginSampling(BaseStrategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args):
         super(MarginSampling, self).__init__(X, Y, idxs_lb, net, handler, args)
 
