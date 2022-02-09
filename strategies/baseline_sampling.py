@@ -71,9 +71,6 @@ def sample_k_imp(Phi, k, max_iter, rng=np.random):
             Ind = Ind_red + [v]
             L_X, L_X_inv = gram_aug(L_Y, L_Y_inv, b_v, c_v)
 
-        if i % k == 0:
-            print('Iter ', i)
-
     return Ind
 
 

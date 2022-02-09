@@ -12,5 +12,6 @@ from .core_set import CoreSet
 from .adversarial_bim import AdversarialBIM
 from .adversarial_deepfool import AdversarialDeepFool
 from .active_learning_by_learning import ActiveLearningByLearning
-from .badge_sampling  import BadgeSampling
-from .baseline_sampling  import BaselineSampling
+from .badge_sampling import BadgeSampling
+from .baseline_sampling import BaselineSampling
+from .wasserstein_adversarial import WassersteinAdversarial

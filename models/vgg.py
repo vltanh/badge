@@ -1,5 +1,3 @@
-'''VGG11/13/16/19 in Pytorch.'''
-import torch
 import torch.nn as nn
 
 cfg = {
@@ -8,6 +6,8 @@ cfg = {
     'VGG16': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 'M', 512, 512, 512, 'M', 512, 512, 512, 'M'],
     'VGG19': [64, 64, 'M', 128, 128, 'M', 256, 256, 256, 256, 'M', 512, 512, 512, 512, 'M', 512, 512, 512, 512, 'M'],
 }
+
+__all__ = ['VGG']
 
 
 class VGG(nn.Module):
@@ -38,10 +38,3 @@ class VGG(nn.Module):
 
     def get_embedding_dim(self):
         return 512
-
-
-def test():
-    net = VGG('VGG11')
-    x = torch.randn(2, 3, 32, 32)
-    y = net(x)
-    print(y.size())
