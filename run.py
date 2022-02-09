@@ -1,8 +1,11 @@
+import datetime
 import argparse
 import time
 
 import numpy as np
 from torchvision import transforms
+from torch.utils.tensorboard import SummaryWriter
+from tqdm import tqdm
 
 from utils import set_deterministic, set_seed
 from models import ResNet18, VGG
@@ -183,10 +186,14 @@ print('Strategy:', type(strategy).__name__)
 print('Query size:', NUM_QUERY)
 print('---------------------------')
 
+
+date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
+writer = SummaryWriter(f'runs/{type(strategy).__name__}_{DATA_NAME}_{date}')
 acc = np.zeros(NUM_ROUND+1)
+query_times = []
 
 # round 0 accuracy
-print(f'Round 0')
+# print(f'Round 0')
 
 # Generate initial pool
 # set_seed(SEED)
@@ -202,18 +209,21 @@ P = strategy.predict(X_te, Y_te)
 acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 
 # Report
-print('Size of labeled pool:', sum(strategy.idxs_lb))
-print('Test Accuracy:', acc[0])
-print('===')
+# print('Size of labeled pool:', sum(strategy.idxs_lb))
+# print('Test Accuracy:', acc[0])
+# print('===')
+writer.add_scalar('Test Accuracy', acc[0], sum(strategy.idxs_lb))
 
-for rd in range(1, NUM_ROUND+1):
-    print(f'Round {rd}')
+pbar = tqdm(range(1, NUM_ROUND+1))
+for rd in pbar:
+    # print(f'Round {rd}')
 
     # Query
     set_seed(SEED)
     start = time.time()
     q_idxs = strategy.query(NUM_QUERY)
-    print('Query time:', time.time() - start)
+    query_times.append(time.time() - start)
+    # print('Query time:', time.time() - start)
 
     # Train
     set_seed(SEED)
@@ -225,11 +235,16 @@ for rd in range(1, NUM_ROUND+1):
     acc[rd] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
 
     # Report
-    print('Size of labeled pool:', sum(strategy.idxs_lb))
-    print('Test Accuracy:', acc[rd])
-    print('===')
+    # print('Size of labeled pool:', sum(strategy.idxs_lb))
+    # print('Test Accuracy:', acc[rd])
+    # print('===')
+    writer.add_scalar('Test Accuracy', acc[rd], sum(strategy.idxs_lb))
 
     # Check done
     if sum(~strategy.idxs_lb) < opts.nQuery:
         print('Too few remaining points to query!')
         break
+
+    pbar.set_description_str(
+        f'[Round {rd:3d}] Query time: {np.mean(query_times):.02f} +/- {np.std(query_times):.04f}'
+    )
