@@ -80,8 +80,7 @@ class BaselineSampling(BaseStrategy):
 
     def query(self, n):
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        gradEmbedding = self.get_grad_embedding(
-            self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled]).numpy()
-        chosen = sample_k_imp(
-            gradEmbedding, n, max_iter=int(5 * n * np.log(n)))
+        gradEmbedding = self.get_grad_embedding(self.X[idxs_unlabeled]).numpy()
+        chosen = sample_k_imp(gradEmbedding, n,
+                              max_iter=int(5 * n * np.log(n)))
         return idxs_unlabeled[chosen]

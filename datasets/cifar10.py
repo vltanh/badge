@@ -17,7 +17,7 @@ def get_CIFAR10(path):
     return X_tr, Y_tr, X_te, Y_te
 
 
-class DataHandler3(Dataset):
+class CIFAR10Train(Dataset):
     def __init__(self, X, Y, transform=None):
         self.X = X
         self.Y = Y
@@ -25,10 +25,25 @@ class DataHandler3(Dataset):
 
     def __getitem__(self, index):
         x, y = self.X[index], self.Y[index]
+        x = Image.fromarray(x)
         if self.transform is not None:
-            x = Image.fromarray(x)
             x = self.transform(x)
         return x, y, index
+
+    def __len__(self):
+        return len(self.X)
+
+
+class CIFAR10Test(Dataset):
+    def __init__(self, X, transform=None):
+        self.X = X
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x = Image.fromarray(self.X[index])
+        if self.transform is not None:
+            x = self.transform(x)
+        return x, index
 
     def __len__(self):
         return len(self.X)

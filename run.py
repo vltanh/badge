@@ -1,11 +1,14 @@
 import datetime
 import argparse
+from multiprocessing import pool
 import time
 
 import numpy as np
 from torchvision import transforms
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from utils import set_deterministic, set_seed
 from models import ResNet18, VGG
@@ -16,6 +19,35 @@ from strategies import RandomSampling, BadgeSampling, \
     LeastConfidenceDropout, MarginSamplingDropout, EntropySamplingDropout, \
     KMeansSampling, KCenterGreedy, BALDDropout, CoreSet, \
     AdversarialBIM, AdversarialDeepFool, ActiveLearningByLearning, WassersteinAdversarial
+
+
+def plot_to_tensorboard(writer, text, fig, step):
+    """
+    Takes a matplotlib figure handle and converts it using
+    canvas and string-casts to a numpy array that can be
+    visualized in TensorBoard using the add_image function
+
+    Parameters:
+        writer (tensorboard.SummaryWriter): TensorBoard SummaryWriter instance.
+        fig (matplotlib.pyplot.fig): Matplotlib figure handle.
+        step (int): counter usually specifying steps/epochs/time.
+    """
+
+    # Draw figure on canvas
+    fig.canvas.draw()
+
+    # Convert the figure to numpy array, read the pixel values and reshape the array
+    img = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    img = img.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+    # Normalize into 0-1 range
+    img = img / 255.0
+    img = img.transpose(2, 0, 1)
+
+    # Add figure in numpy "image" to TensorBoard writer
+    writer.add_image(text, img, step)
+    plt.close(fig)
+
 
 SEED = 3698
 set_deterministic()
@@ -45,24 +77,10 @@ parser.add_argument(
     '--nQuery', type=int, default=100,
     help='number of points to query in a batch',
 )
-parser.add_argument(
-    '--nStart', type=int, default=100,
-    help='number of points to start',
-)
-parser.add_argument(
-    '--nEnd', type=int, default=50000,
-    help='total number of points to query',
-)
-parser.add_argument(
-    '--nEmb', type=int, default=256,
-    help='number of embedding dims (mlp)',
-)
 opts = parser.parse_args()
 
 # parameters
-NUM_INIT_LB = opts.nStart
 NUM_QUERY = opts.nQuery
-NUM_ROUND = int((opts.nEnd - NUM_INIT_LB) / opts.nQuery)
 DATA_NAME = opts.data
 
 # load specified network
@@ -176,8 +194,7 @@ elif opts.alg == 'albl':  # active learning by learning
         LeastConfidence(X_tr, Y_tr, net, handler, args),
         CoreSet(X_tr, Y_tr, net, handler, args)
     ]
-    strategy = ActiveLearningByLearning(X_tr, Y_tr,
-                                        net, handler, args,
+    strategy = ActiveLearningByLearning(X_tr, Y_tr, net, handler, args,
                                         strategy_list=albl_list, delta=0.1)
 else:
     raise ValueError('Invalid strategy.')
@@ -186,65 +203,69 @@ print('Strategy:', type(strategy).__name__)
 print('Query size:', NUM_QUERY)
 print('---------------------------')
 
-
 date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
 writer = SummaryWriter(f'runs/{type(strategy).__name__}_{DATA_NAME}_{date}')
-acc = np.zeros(NUM_ROUND+1)
-query_times = []
 
-# round 0 accuracy
-# print(f'Round 0')
+# Evaluate initial accuracy (without training)
+P = strategy.predict(X_te)
+acc = 1.0 * (Y_te == P).sum().item() / len(Y_te)
+print('Test Accuracy before Training:', acc)
 
-# Generate initial pool
-# set_seed(SEED)
-# q_idxs = np.random.choice(np.arange(n_pool), size=NUM_INIT_LB)
-# strategy.update(q_idxs)
+# Logging
+writer.add_scalar('Test Accuracy', acc, sum(strategy.idxs_lb))
 
-# Train
-# set_seed(SEED)
-# strategy.train()
-
-# Evaluate
-P = strategy.predict(X_te, Y_te)
-acc[0] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
-
-# Report
-# print('Size of labeled pool:', sum(strategy.idxs_lb))
-# print('Test Accuracy:', acc[0])
-# print('===')
-writer.add_scalar('Test Accuracy', acc[0], sum(strategy.idxs_lb))
-
-pbar = tqdm(range(1, NUM_ROUND+1))
+pbar = tqdm(range(1, n_pool // NUM_QUERY + 1))
 for rd in pbar:
-    # print(f'Round {rd}')
-
-    # Query
-    set_seed(SEED)
-    start = time.time()
-    q_idxs = strategy.query(NUM_QUERY)
-    query_times.append(time.time() - start)
-    # print('Query time:', time.time() - start)
-
-    # Train
-    set_seed(SEED)
-    strategy.update(q_idxs)
-    strategy.train()
-
-    # Evaluate
-    P = strategy.predict(X_te, Y_te)
-    acc[rd] = 1.0 * (Y_te == P).sum().item() / len(Y_te)
-
-    # Report
-    # print('Size of labeled pool:', sum(strategy.idxs_lb))
-    # print('Test Accuracy:', acc[rd])
-    # print('===')
-    writer.add_scalar('Test Accuracy', acc[rd], sum(strategy.idxs_lb))
-
     # Check done
     if sum(~strategy.idxs_lb) < opts.nQuery:
         print('Too few remaining points to query!')
-        break
+        continue
+
+    # Query
+    set_seed(SEED)
+
+    start = time.time()
+    q_idxs = strategy.query(NUM_QUERY)
+    query_t = time.time() - start
+
+    strategy.update(q_idxs)
+
+    # Train
+    set_seed(SEED)
+    strategy.setup_network()
+
+    set_seed(SEED)
+    optimizer = strategy.setup_optimizer()
+
+    set_seed(SEED)
+    dataloader = strategy.setup_data()
+
+    set_seed(SEED)
+    train_t = strategy.train(optimizer, dataloader)
+
+    # Evaluate
+    P = strategy.predict(X_te)
+    acc = 1.0 * (Y_te == P).sum().item() / len(Y_te)
+
+    # Logging
+    pool_size = sum(strategy.idxs_lb)
+    writer.add_scalar('Query Time', query_t, pool_size)
+    writer.add_scalar('Training Steps', train_t * pool_size, pool_size)
+    writer.add_scalar('Test Accuracy', acc, pool_size)
+
+    # Plot class distribution of the pool
+    fig, ax = plt.subplots(1, 1, figsize=(10, 5), dpi=50)
+    sns.countplot(x=strategy.Y[strategy.idxs_lb].numpy(), ax=ax)
+    plot_to_tensorboard(writer, 'total_class_distribution', fig, rd)
+
+    # Plot class distribution of the batch
+    fig, ax = plt.subplots(1, 1, figsize=(10, 5), dpi=50)
+    sns.countplot(x=strategy.Y[q_idxs].numpy(), ax=ax)
+    plot_to_tensorboard(writer, 'batch_class_distribution', fig, rd)
 
     pbar.set_description_str(
-        f'[Round {rd:3d}] Query time: {np.mean(query_times):.02f} +/- {np.std(query_times):.04f}'
+        f'[Round {rd:3d}] '
+        + f'Query time: {query_t:.04f} |'
+        + f'Training steps: {train_t * pool_size} |'
+        + f'Test accuracy: {acc:.04f}'
     )

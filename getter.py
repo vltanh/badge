@@ -28,6 +28,6 @@ def get_handler(name):
     elif name == 'SVHN':
         return DataHandler2
     elif name == 'CIFAR10':
-        return DataHandler3
+        return CIFAR10Train, CIFAR10Test
     else:
         raise ValueError('Invalid data name.')

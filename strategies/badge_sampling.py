@@ -4,6 +4,10 @@ from .strategy import BaseStrategy
 
 
 def init_centers(X, K):
+    # If take all (avoid errors)
+    if len(X) == K:
+        return np.arange(len(X))
+
     # List of indices
     indsAll = np.empty(K, dtype=np.uint32)
 
@@ -29,9 +33,6 @@ class BadgeSampling(BaseStrategy):
 
     def query(self, n):
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        gradEmbedding = self.get_grad_embedding(
-            self.X[idxs_unlabeled],
-            self.Y[idxs_unlabeled]
-        ).numpy()
+        gradEmbedding = self.get_grad_embedding(self.X[idxs_unlabeled]).numpy()
         chosen = init_centers(gradEmbedding, n)
         return idxs_unlabeled[chosen]

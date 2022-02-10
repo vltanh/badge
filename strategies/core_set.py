@@ -6,6 +6,7 @@ import pickle
 from datetime import datetime
 from sklearn.metrics import pairwise_distances
 
+
 class CoreSet(BaseStrategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args, tor=1e-4):
         super(CoreSet, self).__init__(X, Y, idxs_lb, net, handler, args)
@@ -37,10 +38,10 @@ class CoreSet(BaseStrategy):
         embedding = self.get_embedding(self.X, self.Y)
         embedding = embedding.numpy()
 
-        chosen = self.furthest_first(embedding[idxs_unlabeled, :], embedding[lb_flag, :], n)
+        chosen = self.furthest_first(
+            embedding[idxs_unlabeled, :], embedding[lb_flag, :], n)
 
         return idxs_unlabeled[chosen]
-
 
     def query_old(self, n):
         lb_flag = self.idxs_lb.copy()
@@ -81,7 +82,7 @@ class CoreSet(BaseStrategy):
         dd = dist_mat[xx, yy]
 
         lb_flag_ = self.idxs_lb.copy()
-        subset = np.where(lb_flag_==True)[0].tolist()
+        subset = np.where(lb_flag_ == True)[0].tolist()
 
         SEED = 5
         sols = None
