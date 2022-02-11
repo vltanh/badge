@@ -1,6 +1,7 @@
 import numpy as np
-from .strategy import BaseStrategy
 from sklearn.cluster import KMeans
+
+from .strategy import BaseStrategy
 
 
 class KMeansSampling(BaseStrategy):
@@ -9,8 +10,7 @@ class KMeansSampling(BaseStrategy):
 
     def query(self, n):
         idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
-        embedding = self.get_embedding(
-            self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled])
+        embedding = self.get_embedding(self.X[idxs_unlabeled])
         embedding = embedding.numpy()
         cluster_learner = KMeans(n_clusters=n)
         cluster_learner.fit(embedding)
@@ -19,7 +19,9 @@ class KMeansSampling(BaseStrategy):
         centers = cluster_learner.cluster_centers_[cluster_idxs]
         dis = (embedding - centers)**2
         dis = dis.sum(axis=1)
-        q_idxs = np.array([np.arange(embedding.shape[0])[
-                          cluster_idxs == i][dis[cluster_idxs == i].argmin()] for i in range(n)])
+        q_idxs = np.array([
+            np.arange(embedding.shape[0])[cluster_idxs == i][dis[cluster_idxs == i].argmin()] 
+            for i in range(n)
+        ])
 
         return idxs_unlabeled[q_idxs]

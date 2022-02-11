@@ -115,32 +115,30 @@ class BaseStrategy:
 
         return probs
 
-    def predict_prob_dropout_split(self, X, Y, n_drop):
-        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+    def predict_prob_dropout_split(self, X, n_drop):
+        loader_te = DataLoader(self.test_handler(X, transform=self.args['transformTest']),
                                shuffle=False, **self.args['loader_te_args'])
 
         self.clf.train()
-        probs = torch.zeros([n_drop, len(Y), self.nclasses])
+        probs = torch.zeros([n_drop, len(X), self.nclasses])
         with torch.no_grad():
             for i in range(n_drop):
-                print('n_drop {}/{}'.format(i+1, n_drop))
-                for x, y, idxs in loader_te:
-                    x, y = Variable(x.cuda()), Variable(y.cuda())
+                for x, idxs in loader_te:
+                    x = Variable(x.cuda())
                     out, e1 = self.clf(x)
                     probs[i][idxs] += F.softmax(out, dim=1).cpu().data
             return probs
 
-    def get_embedding(self, X, Y):
-        loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
+    def get_embedding(self, X):
+        loader_te = DataLoader(self.test_handler(X, transform=self.args['transformTest']),
                                shuffle=False, **self.args['loader_te_args'])
         self.clf.eval()
-        embedding = torch.zeros([len(Y), self.clf.get_embedding_dim()])
+        embedding = torch.zeros([len(X), self.clf.get_embedding_dim()])
         with torch.no_grad():
-            for x, y, idxs in loader_te:
-                x, y = Variable(x.cuda()), Variable(y.cuda())
+            for x, idxs in loader_te:
+                x = Variable(x.cuda())
                 out, e1 = self.clf(x)
                 embedding[idxs] = e1.data.cpu()
-
         return embedding
 
     # gradient embedding (assumes cross-entropy loss)

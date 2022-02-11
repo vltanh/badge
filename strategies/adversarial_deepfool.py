@@ -4,9 +4,12 @@ import torch.nn.functional as F
 from .strategy import BaseStrategy
 from torch.autograd import Variable
 import pdb
+
+
 class AdversarialDeepFool(BaseStrategy):
     def __init__(self, X, Y, idxs_lb, net, handler, args, max_iter=50):
-        super(AdversarialDeepFool, self).__init__(X, Y, idxs_lb, net, handler, args)
+        super(AdversarialDeepFool, self).__init__(
+            X, Y, idxs_lb, net, handler, args)
         self.max_iter = max_iter
 
     def cal_dis(self, x):
@@ -36,7 +39,8 @@ class AdversarialDeepFool(BaseStrategy):
 
                 wi = grad_i - grad_np
                 fi = out[0, i] - out[0, py]
-                value_i = np.abs(float(fi)) / np.linalg.norm(wi.numpy().flatten())
+                value_i = np.abs(float(fi)) / \
+                    np.linalg.norm(wi.numpy().flatten())
 
                 if value_i < value_l:
                     ri = value_i/np.linalg.norm(wi.numpy().flatten()) * wi
@@ -56,7 +60,8 @@ class AdversarialDeepFool(BaseStrategy):
         self.clf.eval()
         dis = np.zeros(idxs_unlabeled.shape)
 
-        data_pool = self.handler(self.X[idxs_unlabeled], self.Y.numpy()[idxs_unlabeled], transform=self.args['transform'])
+        data_pool = self.handler(self.X[idxs_unlabeled], self.Y.numpy()[
+                                 idxs_unlabeled], transform=self.args['transform'])
         for i in range(len(idxs_unlabeled)):
             if i % 100 == 0:
                 print('adv {}/{}'.format(i, len(idxs_unlabeled)), flush=True)
@@ -66,5 +71,3 @@ class AdversarialDeepFool(BaseStrategy):
         self.clf.cuda()
 
         return idxs_unlabeled[dis.argsort()[:n]]
-
-
