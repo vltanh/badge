@@ -1,6 +1,5 @@
 import datetime
 import argparse
-from multiprocessing import pool
 import time
 
 import numpy as np
@@ -12,7 +11,7 @@ import seaborn as sns
 
 from utils import set_deterministic, set_seed
 from models import ResNet18, VGG
-from getter import get_dataset, get_handler
+from datasets import get_dataset, get_handler
 from strategies import RandomSampling, BadgeSampling, \
     BaselineSampling, LeastConfidence, MarginSampling, \
     EntropySampling, CoreSet, ActiveLearningByLearning, \
@@ -49,9 +48,6 @@ def plot_to_tensorboard(writer, text, fig, step):
     plt.close(fig)
 
 
-SEED = 3698
-set_deterministic()
-
 parser = argparse.ArgumentParser()
 parser.add_argument(
     '--alg', type=str, default='rand',
@@ -77,7 +73,14 @@ parser.add_argument(
     '--nQuery', type=int, default=100,
     help='number of points to query in a batch',
 )
+parser.add_argument(
+    '--seed', type=int, default=3698,
+    help='',
+)
 opts = parser.parse_args()
+
+SEED = opts.seed
+set_deterministic()
 
 # parameters
 NUM_QUERY = opts.nQuery
@@ -187,6 +190,8 @@ elif opts.alg == 'entropy':  # entropy-based sampling
 elif opts.alg == 'baseline':
     # badge but with k-DPP sampling instead of k-means++
     strategy = BaselineSampling(X_tr, Y_tr, net, handler, args)
+elif opts.alg == 'kmeans':
+    strategy = KMeansSampling(X_tr, Y_tr, net, handler, args)
 elif opts.alg == 'was_adv':
     strategy = WassersteinAdversarial
 elif opts.alg == 'albl':  # active learning by learning
@@ -265,7 +270,7 @@ for rd in pbar:
 
     pbar.set_description_str(
         f'[Round {rd:3d}] '
-        + f'Query time: {query_t:.04f} |'
-        + f'Training steps: {train_t * pool_size} |'
+        + f'Query time: {query_t:.04f} | '
+        + f'Training steps: {train_t * pool_size} | '
         + f'Test accuracy: {acc:.04f}'
     )

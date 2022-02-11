@@ -17,7 +17,7 @@ def get_SVHN(path):
     return X_tr, Y_tr, X_te, Y_te
 
 
-class DataHandler2(Dataset):
+class SVHN_Labeled(Dataset):
     def __init__(self, X, Y, transform=None):
         self.X = X
         self.Y = Y
@@ -29,6 +29,22 @@ class DataHandler2(Dataset):
             x = Image.fromarray(np.transpose(x, (1, 2, 0)))
             x = self.transform(x)
         return x, y, index
+
+    def __len__(self):
+        return len(self.X)
+
+
+class SVHN_Unlabeled(Dataset):
+    def __init__(self, X, transform=None):
+        self.X = X
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x = self.X[index]
+        if self.transform is not None:
+            x = Image.fromarray(np.transpose(x, (1, 2, 0)))
+            x = self.transform(x)
+        return x, index
 
     def __len__(self):
         return len(self.X)
