@@ -52,8 +52,10 @@ class BaseStrategy:
         self.clf.load_state_dict(self.initial_state)
 
     def setup_optimizer(self):
-        return optim.Adam(self.clf.parameters(),
-                          lr=self.args['lr'], weight_decay=0)
+        if self.args['optimizer'] == 'Adam':
+            return optim.Adam(self.clf.parameters(), **self.args['optimizer_args'])
+        elif self.args['optimizer'] == 'SGD':
+            return optim.SGD(self.clf.parameters(), **self.args['optimizer_args'])
 
     def setup_data(self):
         X = self.X[self.idxs_lb]

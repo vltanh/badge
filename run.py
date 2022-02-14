@@ -54,7 +54,7 @@ parser.add_argument(
     help='acquisition algorithm',
 )
 parser.add_argument(
-    '--lr', type=float, default=1e-4,
+    '--lr', type=float, default=1e-3,
     help='learning rate',
 )
 parser.add_argument(
@@ -108,7 +108,8 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer_args': {'lr': 0.01, 'momentum': 0.5},
+        'optimizer': 'Adam',
+        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'FashionMNIST': {
         'n_epoch': 10,
@@ -122,7 +123,8 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer_args': {'lr': 0.01, 'momentum': 0.5},
+        'optimizer': 'Adam',
+        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'SVHN': {
         'n_epoch': 20,
@@ -138,7 +140,8 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer_args': {'lr': 0.01, 'momentum': 0.5},
+        'optimizer': 'Adam',
+        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'CIFAR10': {
         'n_epoch': 3,
@@ -154,7 +157,8 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': 128, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer_args': {'lr': 0.05, 'momentum': 0.3},
+        'optimizer': 'Adam',
+        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     }
 }
 
