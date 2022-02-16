@@ -8,6 +8,8 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
+from datasets.cifar10 import CIFAR10_Adversarial
+from models.mlp import VGG_10_clf, VGG_10_dis
 
 from utils import set_deterministic, set_seed
 from models import ResNet18, VGG
@@ -144,6 +146,7 @@ args_pool = {
         'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'CIFAR10': {
+        'num_class': 10,
         'n_epoch': 3,
         'transform': transforms.Compose([
             transforms.ToTensor(),
@@ -196,8 +199,14 @@ elif opts.alg == 'baseline':
     strategy = BaselineSampling(X_tr, Y_tr, net, handler, args)
 elif opts.alg == 'kmeans':
     strategy = KMeansSampling(X_tr, Y_tr, net, handler, args)
-elif opts.alg == 'was_adv':
-    strategy = WassersteinAdversarial
+elif opts.alg == 'waal':
+    handler = CIFAR10_Adversarial, handler[1]
+
+    clf = VGG_10_clf()
+    clf.fc.load_state_dict(net.classifier.state_dict())
+    net = net, VGG_10_clf(), VGG_10_dis()
+
+    strategy = WassersteinAdversarial(X_tr, Y_tr, net, handler, args)
 elif opts.alg == 'albl':  # active learning by learning
     albl_list = [
         LeastConfidence(X_tr, Y_tr, net, handler, args),

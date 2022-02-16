@@ -48,3 +48,44 @@ class CIFAR10_Unlabeled(Dataset):
 
     def __len__(self):
         return len(self.X)
+
+
+class CIFAR10_Adversarial(Dataset):
+    def __init__(self, X_1, Y_1, X_2, Y_2, transform=None):
+        self.X1 = X_1
+        self.Y1 = Y_1
+        self.X2 = X_2
+        self.Y2 = Y_2
+        self.transform = transform
+
+    def __len__(self):
+        return max(len(self.X1), len(self.X2))
+
+    def __getitem__(self, index):
+        Len1 = len(self.Y1)
+        Len2 = len(self.Y2)
+
+        if index < Len1:
+            x_1 = self.X1[index]
+            y_1 = self.Y1[index]
+        else:
+            re_index = index % Len1
+            x_1 = self.X1[re_index]
+            y_1 = self.Y1[re_index]
+
+        if index < Len2:
+            x_2 = self.X2[index]
+            y_2 = self.Y2[index]
+        else:
+            re_index = index % Len2
+            x_2 = self.X2[re_index]
+            y_2 = self.Y2[re_index]
+
+        if self.transform is not None:
+            x_1 = Image.fromarray(x_1)
+            x_1 = self.transform(x_1)
+
+            x_2 = Image.fromarray(x_2)
+            x_2 = self.transform(x_2)
+
+        return index, x_1, y_1, x_2, y_2

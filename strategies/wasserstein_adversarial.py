@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 import numpy as np
 import torch
 import torch.nn.functional as F
@@ -40,7 +42,7 @@ def gradient_penalty(critic, h_s, h_t):
 
 
 class WassersteinAdversarial(BaseStrategy):
-    def __init__(self, X, Y, idx_lb, net_fea, net_clf, net_dis, train_handler, test_handler, args):
+    def __init__(self, X, Y, net, handler, args):
         """
         :param X:
         :param Y:
@@ -53,26 +55,47 @@ class WassersteinAdversarial(BaseStrategy):
         :param test_handler: generate a dataset for the prediction, only requires one dataset
         :param args:
         """
+        # super().__init__(X, Y, net, handler, args)
+        use_cuda = torch.cuda.is_available()
+        self.device = torch.device("cuda" if use_cuda else "cpu")
 
         self.X = X
         self.Y = Y
-        self.idx_lb = idx_lb
-        self.net_fea = net_fea
-        self.net_clf = net_clf
-        self.net_dis = net_dis
-        self.train_handler = train_handler
-        self.test_handler = test_handler
+
+        self.fea, self.clf, self.dis = net
+        self.fea = self.fea.to(self.device)
+        self.clf = self.clf.to(self.device)
+        self.dis = self.dis.to(self.device)
+
+        self.init_fea = deepcopy(self.fea.state_dict())
+        self.init_clf = deepcopy(self.clf.state_dict())
+        self.init_dis = deepcopy(self.dis.state_dict())
+
+        self.train_handler, self.test_handler = handler
         self.args = args
 
         self.n_pool = len(Y)
         self.num_class = self.args['num_class']
-        use_cuda = torch.cuda.is_available()
-        self.device = torch.device("cuda" if use_cuda else "cpu")
 
         self.selection = 10
         # for cifar 10 or svhn or fashion mnist  self.selection = 10
 
-    def train(self, alpha, total_epoch):
+        self.idxs_lb = np.zeros(len(Y), dtype=np.bool8)
+
+    def setup_network(self):
+        self.fea.load_state_dict(self.init_fea)
+        self.clf.load_state_dict(self.init_clf)
+        self.dis.load_state_dict(self.init_dis)
+
+    def setup_data(self):
+        idx_lb_train = np.arange(self.n_pool)[self.idxs_lb]
+        idx_ulb_train = np.arange(self.n_pool)[~self.idxs_lb]
+        return DataLoader(self.train_handler(self.X[idx_lb_train], self.Y[idx_lb_train],
+                                             self.X[idx_ulb_train], self.Y[idx_ulb_train],
+                                             transform=self.args['transform']),
+                          shuffle=True, **self.args['loader_tr_args'])
+
+    def train(self, optimizer, dataloader, alpha=2e-3, total_epoch=80):
         """
         Only training samples with labeled and unlabeled data-set
         alpha is the trade-off between the empirical loss and error, the more interaction, the smaller \alpha
@@ -83,45 +106,31 @@ class WassersteinAdversarial(BaseStrategy):
         # n_epoch = self.args['n_epoch']
         n_epoch = total_epoch
 
-        self.fea = self.net_fea().to(self.device)
-        self.clf = self.net_clf().to(self.device)
-        self.dis = self.net_dis().to(self.device)
-
         # setting three optimizers
-        opt_fea = optim.SGD(self.fea.parameters(),
-                            **self.args['optimizer_args'])
-        opt_clf = optim.SGD(self.clf.parameters(),
-                            **self.args['optimizer_args'])
-        opt_dis = optim.SGD(self.dis.parameters(),
-                            **self.args['optimizer_args'])
+        opt_fea = optim.Adam(self.fea.parameters(),
+                             **self.args['optimizer_args'])
+        opt_clf = optim.Adam(self.clf.parameters(),
+                             **self.args['optimizer_args'])
+        opt_dis = optim.Adam(self.dis.parameters(),
+                             **self.args['optimizer_args'])
 
-        # setting idx_lb and idx_ulb
-        idx_lb_train = np.arange(self.n_pool)[self.idx_lb]
-        idx_ulb_train = np.arange(self.n_pool)[~self.idx_lb]
+        idx_lb_train = np.arange(self.n_pool)[self.idxs_lb]
+        idx_ulb_train = np.arange(self.n_pool)[~self.idxs_lb]
 
         # computing the unbalancing ratio, a value betwwen [0,1], generally 0.1 - 0.5
-        gamma_ratio = len(idx_lb_train)/len(idx_ulb_train)
+        gamma_ratio = len(idx_lb_train) / len(idx_ulb_train)
         # gamma_ratio = 1
 
-        # Data-loading (Redundant Trick)
-        loader_tr = DataLoader(self.train_handler(self.X[idx_lb_train], self.Y[idx_lb_train],
-                                                  self.X[idx_ulb_train], self.Y[idx_ulb_train],
-                                                  transform=self.args['transform_tr']),
-                               shuffle=True, **self.args['loader_tr_args'])
-
-        for epoch in range(n_epoch):
+        epoch = 0
+        acc = 0.
+        while acc < 0.99:
             # setting the training mode in the beginning of EACH epoch
             # (since we need to compute the training accuracy during the epoch, optional)
             self.fea.train()
             self.clf.train()
             self.dis.train()
 
-            # Total_loss = 0
-            # n_batch    = 0
-            # acc        = 0
-            for index, label_x, label_y, unlabel_x, _ in loader_tr:
-                # n_batch += 1
-
+            for index, label_x, label_y, unlabel_x, _ in dataloader:
                 label_x, label_y = label_x.cuda(), label_y.cuda()
                 unlabel_x = unlabel_x.cuda()
 
@@ -130,8 +139,8 @@ class WassersteinAdversarial(BaseStrategy):
                 set_requires_grad(self.clf, requires_grad=True)
                 set_requires_grad(self.dis, requires_grad=False)
 
-                lb_z = self.fea(label_x)
-                unlb_z = self.fea(unlabel_x)
+                _, lb_z = self.fea(label_x)
+                _, unlb_z = self.fea(unlabel_x)
 
                 opt_fea.zero_grad()
                 opt_clf.zero_grad()
@@ -146,8 +155,8 @@ class WassersteinAdversarial(BaseStrategy):
                     - gamma_ratio * self.dis(lb_z).mean()
 
                 with torch.no_grad():
-                    lb_z = self.fea(label_x)
-                    unlb_z = self.fea(unlabel_x)
+                    _, lb_z = self.fea(label_x)
+                    _, unlb_z = self.fea(unlabel_x)
 
                 gp = gradient_penalty(self.dis, unlb_z, lb_z)
 
@@ -165,8 +174,8 @@ class WassersteinAdversarial(BaseStrategy):
                 set_requires_grad(self.dis, requires_grad=True)
 
                 with torch.no_grad():
-                    lb_z = self.fea(label_x)
-                    unlb_z = self.fea(unlabel_x)
+                    _, lb_z = self.fea(label_x)
+                    _, unlb_z = self.fea(unlabel_x)
 
                 for _ in range(1):
                     # gradient ascent for multiple times like GANS training
@@ -181,37 +190,46 @@ class WassersteinAdversarial(BaseStrategy):
                     dis_loss.backward()
                     opt_dis.step()
 
-                # prediction and computing training accuracy and empirical loss under evaluation mode
-                # P = lb_out.max(1)[1]
-                # acc += 1.0 * (label_y == P).sum().item() / len(label_y)
-                # Total_loss += loss.item()
+            with torch.no_grad():
+                self.fea.eval()
+                self.clf.eval()
+                self.dis.eval()
 
-            # Total_loss /= n_batch
-            # acc        /= n_batch
+                n_batch = 0
+                acc = 0.
+                for index, label_x, label_y, _, _ in dataloader:
+                    n_batch += len(label_y)
 
-            print('==========Inner epoch {:d} ========'.format(epoch))
-            # print('Training Loss {:.3f}'.format(Total_loss))
-            # print('Training accuracy {:.3f}'.format(acc*100))
+                    label_x, label_y = label_x.cuda(), label_y.cuda()
+                    _, lb_z = self.fea(label_x)
+                    lb_out, _ = self.clf(lb_z)
 
-    def predict(self, X, Y):
-        loader_te = DataLoader(self.test_handler(X, Y, transform=self.args['transform_te']),
+                    P = lb_out.max(1)[1]
+                    acc += 1.0 * (label_y == P).sum().item()
+                acc /= n_batch
+
+                print('==========Inner epoch {:d} ========'.format(epoch))
+                print('Training accuracy {:.4f}'.format(acc))
+
+            epoch += 1
+        return epoch
+
+    def predict(self, X):
+        loader_te = DataLoader(self.test_handler(X, transform=self.args['transformTest']),
                                shuffle=False, **self.args['loader_te_args'])
-
         self.fea.eval()
         self.clf.eval()
-
-        P = torch.zeros(len(Y), dtype=Y.dtype)
+        P = torch.zeros(len(X)).long()
         with torch.no_grad():
-            for x, y, idxs in loader_te:
-                x, y = x.to(self.device), y.to(self.device)
-                latent = self.fea(x)
+            for x, idxs in loader_te:
+                x = x.to(self.device)
+                _, latent = self.fea(x)
                 out, _ = self.clf(latent)
                 pred = out.max(1)[1]
                 P[idxs] = pred.cpu()
-
         return P
 
-    def predict_prob(self, X, Y):
+    def predict_prob(self, X):
         """
         prediction output score probability
         :param X:
@@ -219,25 +237,25 @@ class WassersteinAdversarial(BaseStrategy):
         :return:
         """
 
-        loader_te = DataLoader(self.test_handler(X, Y, transform=self.args['transform_te']),
+        loader_te = DataLoader(self.test_handler(X, transform=self.args['transformTest']),
                                shuffle=False, **self.args['loader_te_args'])
 
         self.fea.eval()
         self.clf.eval()
 
-        probs = torch.zeros([len(Y), self.num_class])
+        probs = torch.zeros([len(X), self.num_class])
         with torch.no_grad():
 
-            for x, y, idxs in loader_te:
-                x, y = x.to(self.device), y.to(self.device)
-                latent = self.fea(x)
+            for x, idxs in loader_te:
+                x = x.to(self.device)
+                _, latent = self.fea(x)
                 out, _ = self.clf(latent)
                 prob = F.softmax(out, dim=1)
                 probs[idxs] = prob.cpu()
 
         return probs
 
-    def pred_dis_score(self, X, Y):
+    def pred_dis_score(self, X):
         """
         prediction discrimnator score
         :param X:
@@ -246,19 +264,18 @@ class WassersteinAdversarial(BaseStrategy):
 
         """
 
-        loader_te = DataLoader(self.test_handler(X, Y, transform=self.args['transform_te']),
+        loader_te = DataLoader(self.test_handler(X, transform=self.args['transformTest']),
                                shuffle=False, **self.args['loader_te_args'])
 
         self.fea.eval()
         self.dis.eval()
 
-        scores = torch.zeros(len(Y))
+        scores = torch.zeros(len(X))
 
         with torch.no_grad():
-            for x, y, idxs in loader_te:
-
-                x, y = x.to(self.device), y.to(self.device)
-                latent = self.fea(x)
+            for x, idxs in loader_te:
+                x = x.to(self.device)
+                _, latent = self.fea(x)
                 out = self.dis(latent).cpu()
                 scores[idxs] = out.view(-1)
 
@@ -310,22 +327,20 @@ class WassersteinAdversarial(BaseStrategy):
 
         """
 
-        idxs_unlabeled = np.arange(self.n_pool)[~self.idx_lb]
+        idxs_unlabeled = np.arange(self.n_pool)[~self.idxs_lb]
 
         # prediction output probability
-        probs = self.predict_prob(
-            self.X[idxs_unlabeled], self.Y[idxs_unlabeled])
+        probs = self.predict_prob(self.X[idxs_unlabeled])
 
         # uncertainly score (three options, single_worst, L2_upper, L1_upper)
         # uncertainly_score = self.single_worst(probs)
-        uncertainly_score = 0.5 * \
-            self.L2_upper(probs) + 0.5 * self.L1_upper(probs)
+        uncertainly_score = 0.5 * self.L2_upper(probs) \
+            + 0.5 * self.L1_upper(probs)
 
         # print(uncertainly_score)
 
         # prediction output discriminative score
-        dis_score = self.pred_dis_score(
-            self.X[idxs_unlabeled], self.Y[idxs_unlabeled])
+        dis_score = self.pred_dis_score(self.X[idxs_unlabeled])
 
         # print(dis_score)
 
