@@ -4,6 +4,7 @@ from .svhn import *
 from .mnist import *
 from .fashion_mnist import *
 from .cifar10 import *
+from .cifar100 import *
 
 
 def get_dataset(name, path):
@@ -18,6 +19,8 @@ def get_dataset(name, path):
         return get_SVHN(path)
     elif name == 'CIFAR10':
         return get_CIFAR10(path)
+    elif name == 'CIFAR100':
+        return get_CIFAR100(path)
     else:
         raise ValueError('Invalid data name.')
 
@@ -31,5 +34,7 @@ def get_handler(name):
         return SVHN_Labeled, SVHN_Unlabeled
     elif name == 'CIFAR10':
         return CIFAR10_Labeled, CIFAR10_Unlabeled
+    elif name == 'CIFAR100':
+        return CIFAR100_Labeled, CIFAR100_Unlabeled
     else:
         raise ValueError('Invalid data name.')

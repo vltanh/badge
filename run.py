@@ -76,6 +76,10 @@ parser.add_argument(
     help='number of points to query in a batch',
 )
 parser.add_argument(
+    '--nEnd', type=int, default=20000,
+    help='number of points to query in total',
+)
+parser.add_argument(
     '--seed', type=int, default=3698,
     help='',
 )
@@ -87,15 +91,6 @@ set_deterministic()
 # parameters
 NUM_QUERY = opts.nQuery
 DATA_NAME = opts.data
-
-# load specified network
-set_seed(SEED)
-if opts.model == 'resnet':
-    net = ResNet18()
-elif opts.model == 'vgg':
-    net = VGG('VGG16')
-else:
-    raise ValueError('Invalid choice of model [resnet/vgg].')
 
 args_pool = {
     'MNIST': {
@@ -162,10 +157,39 @@ args_pool = {
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
         'optimizer': 'Adam',
         'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
-    }
+    },
+    'CIFAR100': {
+        'num_class': 100,
+        'n_epoch': 3,
+        'transform': transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                 (0.2470, 0.2435, 0.2616))
+        ]),
+        'transformTest': transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                 (0.2470, 0.2435, 0.2616))
+        ]),
+        'loader_tr_args': {'batch_size': 128, 'num_workers': 0},
+        'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
+        'optimizer': 'Adam',
+        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
+    },
 }
 
 args = args_pool[DATA_NAME]
+
+# load specified network
+set_seed(SEED)
+if opts.model == 'resnet':
+    net = ResNet18(nclasses=args['num_class'])
+elif opts.model == 'vgg':
+    net = VGG('VGG16', nclasses=args['num_class'])
+else:
+    raise ValueError('Invalid choice of model [resnet/vgg].')
+
+# Load data
 X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path)
 handler = get_handler(opts.data)
 
@@ -259,7 +283,9 @@ for rd in pbar:
     dataloader = strategy.setup_data()
 
     set_seed(SEED)
-    train_t = strategy.train(optimizer, dataloader)
+    start = time.time()
+    train_step = strategy.train(optimizer, dataloader)
+    train_t = time.time() - start
 
     # Evaluate
     P = strategy.predict(X_te)
@@ -268,7 +294,8 @@ for rd in pbar:
     # Logging
     pool_size = sum(strategy.idxs_lb)
     writer.add_scalar('Query Time', query_t, pool_size)
-    writer.add_scalar('Training Steps', train_t * pool_size, pool_size)
+    writer.add_scalar('Training Steps', train_step * pool_size, pool_size)
+    writer.add_scalar('Training Time', train_t, pool_size)
     writer.add_scalar('Test Accuracy', acc, pool_size)
 
     # Plot class distribution of the pool
@@ -284,6 +311,6 @@ for rd in pbar:
     pbar.set_description_str(
         f'[Round {rd:3d}] '
         + f'Query time: {query_t:.04f} | '
-        + f'Training steps: {train_t * pool_size} | '
+        + f'Training time: {train_t:.04f} | '
         + f'Test accuracy: {acc:.04f}'
     )
