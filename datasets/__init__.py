@@ -5,6 +5,7 @@ from .mnist import *
 from .fashion_mnist import *
 from .cifar10 import *
 from .cifar100 import *
+from .food200 import *
 
 
 def get_dataset(name, path):
@@ -21,6 +22,8 @@ def get_dataset(name, path):
         return get_CIFAR10(path)
     elif name == 'CIFAR100':
         return get_CIFAR100(path)
+    elif name == 'FOOD200':
+        return get_FOOD200(path)
     else:
         raise ValueError('Invalid data name.')
 
@@ -36,5 +39,7 @@ def get_handler(name):
         return CIFAR10_Labeled, CIFAR10_Unlabeled
     elif name == 'CIFAR100':
         return CIFAR100_Labeled, CIFAR100_Unlabeled
+    elif name == 'FOOD200':
+        return FOOD200_Labeled, FOOD200_Unlabeled
     else:
         raise ValueError('Invalid data name.')

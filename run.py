@@ -176,6 +176,25 @@ args_pool = {
         'optimizer': 'Adam',
         'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
+    'FOOD200': {
+        'num_class': 200,
+        'transform': transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                 (0.2470, 0.2435, 0.2616))
+        ]),
+        'transformTest': transforms.Compose([
+            transforms.Resize((256, 256)),
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                 (0.2470, 0.2435, 0.2616))
+        ]),
+        'loader_tr_args': {'batch_size': 256, 'num_workers': 0},
+        'loader_te_args': {'batch_size': 512, 'num_workers': 0},
+        'optimizer': 'Adam',
+        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
+    },
 }
 
 args = args_pool[DATA_NAME]
@@ -256,7 +275,7 @@ print('Test Accuracy before Training:', acc)
 # Logging
 writer.add_scalar('Test Accuracy', acc, sum(strategy.idxs_lb))
 
-pbar = tqdm(range(1, n_pool // NUM_QUERY + 1))
+pbar = tqdm(range(1, opts.nEnd // NUM_QUERY + 1))
 for rd in pbar:
     # Check done
     if sum(~strategy.idxs_lb) < opts.nQuery:
