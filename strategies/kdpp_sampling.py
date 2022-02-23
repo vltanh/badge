@@ -1,4 +1,5 @@
 import numpy as np
+
 from .strategy import BaseStrategy
 
 
@@ -74,7 +75,7 @@ def sample_k_imp(Phi, k, max_iter, rng=np.random):
     return Ind
 
 
-class BaselineSampling(BaseStrategy):
+class kDPPSampling(BaseStrategy):
     def __init__(self, X, Y, net, handler, args):
         super().__init__(X, Y, net, handler, args)
 

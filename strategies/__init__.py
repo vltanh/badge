@@ -13,5 +13,5 @@ from .adversarial_bim import AdversarialBIM
 from .adversarial_deepfool import AdversarialDeepFool
 from .active_learning_by_learning import ActiveLearningByLearning
 from .badge_sampling import BadgeSampling
-from .baseline_sampling import BaselineSampling
+from .kdpp_sampling import kDPPSampling
 from .wasserstein_adversarial import WassersteinAdversarial
