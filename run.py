@@ -14,13 +14,7 @@ from models.mlp import VGG_10_clf, VGG_10_dis
 from utils import set_deterministic, set_seed
 from models import ResNet18, VGG
 from datasets import get_dataset, get_handler
-from strategies import RandomSampling, BadgeSampling, \
-    BaselineSampling, LeastConfidence, MarginSampling, \
-    EntropySampling, CoreSet, ActiveLearningByLearning, \
-    LeastConfidenceDropout, MarginSamplingDropout, EntropySamplingDropout, \
-    KMeansSampling, KCenterGreedy, BALDDropout, CoreSet, \
-    AdversarialBIM, AdversarialDeepFool, ActiveLearningByLearning, WassersteinAdversarial
-
+from strategies import *
 
 def plot_to_tensorboard(writer, text, fig, step):
     """
@@ -76,11 +70,15 @@ parser.add_argument(
     help='number of points to query in a batch',
 )
 parser.add_argument(
-    '--nEnd', type=int, default=20000,
+    '--nEnd', type=int, default=25000,
     help='number of points to query in total',
 )
 parser.add_argument(
     '--seed', type=int, default=3698,
+    help='',
+)
+parser.add_argument(
+    '--aug', action='store_true',
     help='',
 )
 opts = parser.parse_args()
@@ -144,6 +142,12 @@ args_pool = {
         'num_class': 10,
         'n_epoch': 3,
         'transform': transforms.Compose([
+            transforms.RandomCrop(32, padding=4), 
+            transforms.RandomHorizontalFlip(), 
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                 (0.2470, 0.2435, 0.2616))
+        ]) if opts.aug else transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2470, 0.2435, 0.2616))
@@ -191,7 +195,7 @@ args_pool = {
                                  (0.2470, 0.2435, 0.2616))
         ]),
         'loader_tr_args': {'batch_size': 256, 'num_workers': 0},
-        'loader_te_args': {'batch_size': 512, 'num_workers': 0},
+        'loader_te_args': {'batch_size': 1024, 'num_workers': 0},
         'optimizer': 'Adam',
         'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
@@ -212,16 +216,16 @@ else:
 X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path)
 handler = get_handler(opts.data)
 
-args['lr'] = opts.lr
+args['optimizer_args']['lr'] = opts.lr
 
 # start experiment
 n_pool = len(Y_tr)
 n_test = len(Y_te)
 
-print('Dataset:', DATA_NAME)
-print('Size of training pool: {}'.format(n_pool))
-print('Size of testing pool: {}'.format(n_test))
-print('---------------------------')
+print('Dataset:', DATA_NAME, flush=True)
+print('Size of training pool: {}'.format(n_pool), flush=True)
+print('Size of testing pool: {}'.format(n_test), flush=True)
+print('---------------------------', flush=True)
 
 # set up the specified sampler
 set_seed(SEED)
@@ -237,9 +241,9 @@ elif opts.alg == 'coreset':  # coreset sampling
     strategy = CoreSet(X_tr, Y_tr, net, handler, args)
 elif opts.alg == 'entropy':  # entropy-based sampling
     strategy = EntropySampling(X_tr, Y_tr, net, handler, args)
-elif opts.alg == 'baseline':
+elif opts.alg == 'kdpp':
     # badge but with k-DPP sampling instead of k-means++
-    strategy = BaselineSampling(X_tr, Y_tr, net, handler, args)
+    strategy = kDPPSampling(X_tr, Y_tr, net, handler, args)
 elif opts.alg == 'kmeans':
     strategy = KMeansSampling(X_tr, Y_tr, net, handler, args)
 elif opts.alg == 'waal':
@@ -260,17 +264,17 @@ elif opts.alg == 'albl':  # active learning by learning
 else:
     raise ValueError('Invalid strategy.')
 
-print('Strategy:', type(strategy).__name__)
-print('Query size:', NUM_QUERY)
-print('---------------------------')
+print('Strategy:', type(strategy).__name__, flush=True)
+print('Query size:', NUM_QUERY, flush=True)
+print('---------------------------', flush=True)
 
 date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-writer = SummaryWriter(f'runs/{type(strategy).__name__}_{DATA_NAME}_{date}')
+writer = SummaryWriter(f'runs/{type(strategy).__name__}_{DATA_NAME}_{opts.model}{"_aug" if opts.aug else ""}_{date}')
 
 # Evaluate initial accuracy (without training)
 P = strategy.predict(X_te)
 acc = 1.0 * (Y_te == P).sum().item() / len(Y_te)
-print('Test Accuracy before Training:', acc)
+print('Test Accuracy before Training:', acc, flush=True)
 
 # Logging
 writer.add_scalar('Test Accuracy', acc, sum(strategy.idxs_lb))
@@ -279,7 +283,7 @@ pbar = tqdm(range(1, opts.nEnd // NUM_QUERY + 1))
 for rd in pbar:
     # Check done
     if sum(~strategy.idxs_lb) < opts.nQuery:
-        print('Too few remaining points to query!')
+        print('Too few remaining points to query!', flush=True)
         continue
 
     # Query
