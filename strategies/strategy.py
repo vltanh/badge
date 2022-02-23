@@ -66,9 +66,18 @@ class BaseStrategy:
     def train(self, optimizer, dataloader):
         epoch = 0
         accCurrent = 0.
-        while accCurrent < 0.99:
+
+        c = 0
+        best_acc = 0.
+        while accCurrent < 0.99 and c < 10 and epoch < 300:
             accCurrent = self._train(self.clf, epoch, dataloader, optimizer)
+            print(f'Epoch {epoch}: {accCurrent}', flush=True)
             epoch += 1
+            if accCurrent > best_acc:
+                c = 0
+                best_acc = accCurrent
+            else:
+                c += 1
         return epoch
 
     def predict(self, X):
@@ -143,7 +152,6 @@ class BaseStrategy:
                 embedding[idxs] = e1.data.cpu()
         return embedding
 
-    # gradient embedding (assumes cross-entropy loss)
     def get_grad_embedding(self, X):
         model = self.clf
         embDim = model.get_embedding_dim()
