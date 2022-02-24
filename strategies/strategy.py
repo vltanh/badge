@@ -23,6 +23,10 @@ class BaseStrategy:
         self.args = args
         self.n_pool = len(Y)
 
+    def init_query(self, n):
+        inds = np.where(self.idxs_lb == 0)[0]
+        return inds[np.random.permutation(len(inds))][:n]
+
     def query(self, n):
         pass
 
@@ -63,21 +67,28 @@ class BaseStrategy:
         ds = self.train_handler(X, Y, transform=self.args['transform'])
         return DataLoader(ds, shuffle=True, **self.args['loader_tr_args'])
 
+    def check_saturation(self, acc_monitor):
+        for i in range(len(acc_monitor)):
+            for j in range(i+1, len(acc_monitor)):
+                if acc_monitor[j] - acc_monitor[i] >= 0.001:
+                    return False
+        return True
+
     def train(self, optimizer, dataloader):
         epoch = 0
         accCurrent = 0.
+        acc_monitor = []
 
-        c = 0
+        saturated = False
         best_acc = 0.
-        while accCurrent < 0.99 and c < 10 and epoch < 300:
+        while accCurrent < 0.99 and not saturated and epoch < 300:
             accCurrent = self._train(self.clf, epoch, dataloader, optimizer)
             print(f'Epoch {epoch}: {accCurrent}', flush=True)
             epoch += 1
-            if accCurrent > best_acc:
-                c = 0
-                best_acc = accCurrent
-            else:
-                c += 1
+            acc_monitor.append(accCurrent)
+            if len(acc_monitor) >= 10:
+                saturated = self.check_saturation(acc_monitor)
+                del acc_monitor[0]
         return epoch
 
     def predict(self, X):
