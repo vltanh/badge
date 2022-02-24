@@ -8,13 +8,14 @@ from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 import seaborn as sns
-from datasets.cifar10 import CIFAR10_Adversarial
-from models.mlp import VGG_10_clf, VGG_10_dis
 
 from utils import set_deterministic, set_seed
 from models import ResNet18, VGG
+from models.mlp import VGG_10_clf, VGG_10_dis
 from datasets import get_dataset, get_handler
+from datasets.cifar10 import CIFAR10_Adversarial
 from strategies import *
+
 
 def plot_to_tensorboard(writer, text, fig, step):
     """
@@ -66,12 +67,20 @@ parser.add_argument(
     help='dataset (non-openML)',
 )
 parser.add_argument(
+    '--nStart', type=int, default=1000,
+    help='number of points in the beginning',
+)
+parser.add_argument(
     '--nQuery', type=int, default=100,
     help='number of points to query in a batch',
 )
 parser.add_argument(
     '--nEnd', type=int, default=25000,
     help='number of points to query in total',
+)
+parser.add_argument(
+    '--batch_size', type=int, default=20,
+    help='training batch size',
 )
 parser.add_argument(
     '--seed', type=int, default=3698,
@@ -157,7 +166,7 @@ args_pool = {
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2470, 0.2435, 0.2616))
         ]),
-        'loader_tr_args': {'batch_size': 128, 'num_workers': 0},
+        'loader_tr_args': {'batch_size': opts.batch_size, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
         'optimizer': 'Adam',
         'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
@@ -269,7 +278,7 @@ print('Query size:', NUM_QUERY, flush=True)
 print('---------------------------', flush=True)
 
 date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-writer = SummaryWriter(f'runs/{type(strategy).__name__}_{DATA_NAME}_{opts.model}{"_aug" if opts.aug else ""}_{date}')
+writer = SummaryWriter(f'runs/{type(strategy).__name__}_{DATA_NAME}_{opts.model}{"_aug" if opts.aug else ""}_{opts.batch_size}_{date}')
 
 # Evaluate initial accuracy (without training)
 P = strategy.predict(X_te)
@@ -279,7 +288,34 @@ print('Test Accuracy before Training:', acc, flush=True)
 # Logging
 writer.add_scalar('Test Accuracy', acc, sum(strategy.idxs_lb))
 
-pbar = tqdm(range(1, opts.nEnd // NUM_QUERY + 1))
+# Seed
+set_seed(SEED)
+q_idxs = strategy.init_query(opts.nStart)
+strategy.update(q_idxs)
+
+# Train
+set_seed(SEED)
+strategy.setup_network()
+
+set_seed(SEED)
+optimizer = strategy.setup_optimizer()
+
+set_seed(SEED)
+dataloader = strategy.setup_data()
+
+set_seed(SEED)
+start = time.time()
+train_step = strategy.train(optimizer, dataloader)
+train_t = time.time() - start
+
+# Evaluate
+P = strategy.predict(X_te)
+acc = 1.0 * (Y_te == P).sum().item() / len(Y_te)
+
+# Logging
+writer.add_scalar('Test Accuracy', acc, sum(strategy.idxs_lb))
+
+pbar = tqdm(range(1, (opts.nEnd - opts.nStart) // NUM_QUERY + 1))
 for rd in pbar:
     # Check done
     if sum(~strategy.idxs_lb) < opts.nQuery:
@@ -287,7 +323,7 @@ for rd in pbar:
         continue
 
     # Query
-    set_seed(SEED)
+    set_seed(SEED + rd)
 
     start = time.time()
     q_idxs = strategy.query(NUM_QUERY)
@@ -305,7 +341,7 @@ for rd in pbar:
     set_seed(SEED)
     dataloader = strategy.setup_data()
 
-    set_seed(SEED)
+    set_seed(SEED + rd)
     start = time.time()
     train_step = strategy.train(optimizer, dataloader)
     train_t = time.time() - start
