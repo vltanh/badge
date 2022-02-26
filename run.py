@@ -175,6 +175,12 @@ args_pool = {
         'num_class': 100,
         'n_epoch': 3,
         'transform': transforms.Compose([
+            transforms.RandomCrop(32, padding=4), 
+            transforms.RandomHorizontalFlip(), 
+            transforms.ToTensor(),
+            transforms.Normalize((0.4914, 0.4822, 0.4465),
+                                 (0.2470, 0.2435, 0.2616))
+        ]) if opts.aug else transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2470, 0.2435, 0.2616))
@@ -184,7 +190,7 @@ args_pool = {
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2470, 0.2435, 0.2616))
         ]),
-        'loader_tr_args': {'batch_size': 128, 'num_workers': 0},
+        'loader_tr_args': {'batch_size': opts.batch_size, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
         'optimizer': 'Adam',
         'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
@@ -373,3 +379,4 @@ for rd in pbar:
         + f'Training time: {train_t:.04f} | '
         + f'Test accuracy: {acc:.04f}'
     )
+writer.close()

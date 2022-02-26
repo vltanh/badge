@@ -28,7 +28,7 @@ class BaseStrategy:
         return inds[np.random.permutation(len(inds))][:n]
 
     def query(self, n):
-        pass
+        raise Exception("Not implemented")
 
     def update(self, idxs_lb):
         self.idxs_lb[idxs_lb] = True
