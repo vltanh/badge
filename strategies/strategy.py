@@ -56,10 +56,21 @@ class BaseStrategy:
         self.clf.load_state_dict(self.initial_state)
 
     def setup_optimizer(self):
-        if self.args['optimizer'] == 'Adam':
-            return optim.Adam(self.clf.parameters(), **self.args['optimizer_args'])
-        elif self.args['optimizer'] == 'SGD':
-            return optim.SGD(self.clf.parameters(), **self.args['optimizer_args'])
+        if self.args['optimizer'] == 'adam':
+            optimizer = optim.Adam(self.clf.parameters(),
+                                   **self.args['optimizer_args'])
+        elif self.args['optimizer'] == 'sgd':
+            optimizer = optim.SGD(self.clf.parameters(),
+                                  **self.args['optimizer_args'])
+        return optimizer
+
+    def setup_scheduler(self, optimizer):
+        if self.args['scheduler'] == 'none':
+            scheduler = None
+        elif self.args['scheduler'] == 'cosine':
+            scheduler = optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=self.args['max_epoch'])
+        return scheduler
 
     def setup_data(self):
         X = self.X[self.idxs_lb]
@@ -74,15 +85,16 @@ class BaseStrategy:
                     return False
         return True
 
-    def train(self, optimizer, dataloader):
+    def train(self, dataloader, optimizer, scheduler):
         epoch = 0
         accCurrent = 0.
         acc_monitor = []
 
         saturated = False
-        best_acc = 0.
-        while accCurrent < 0.99 and not saturated and epoch < 300:
+        while accCurrent < self.args['max_acc'] and not saturated and epoch < self.args['max_epoch']:
             accCurrent = self._train(self.clf, epoch, dataloader, optimizer)
+            if scheduler is not None:
+                scheduler.step()
             print(f'Epoch {epoch}: {accCurrent}', flush=True)
             epoch += 1
             acc_monitor.append(accCurrent)

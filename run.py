@@ -59,8 +59,20 @@ parser.add_argument(
     help='model - resnet, vgg',
 )
 parser.add_argument(
+    '--optimizer', type=str, default='adam',
+    help='optimizer - adam, sgd',
+)
+parser.add_argument(
+    '--scheduler', type=str, default='none',
+    help='scheduler - none, cosine',
+)
+parser.add_argument(
     '--path', type=str, default='data',
     help='data path',
+)
+parser.add_argument(
+    '--out', type=str, default='runs',
+    help='output path',
 )
 parser.add_argument(
     '--data', type=str,
@@ -90,6 +102,7 @@ parser.add_argument(
     '--aug', action='store_true',
     help='',
 )
+
 opts = parser.parse_args()
 
 SEED = opts.seed
@@ -112,8 +125,6 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer': 'Adam',
-        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'FashionMNIST': {
         'n_epoch': 10,
@@ -127,8 +138,6 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer': 'Adam',
-        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'SVHN': {
         'n_epoch': 20,
@@ -144,15 +153,13 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': 64, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer': 'Adam',
-        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'CIFAR10': {
         'num_class': 10,
         'n_epoch': 3,
         'transform': transforms.Compose([
-            transforms.RandomCrop(32, padding=4), 
-            transforms.RandomHorizontalFlip(), 
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2470, 0.2435, 0.2616))
@@ -168,15 +175,13 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': opts.batch_size, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer': 'Adam',
-        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'CIFAR100': {
         'num_class': 100,
         'n_epoch': 3,
         'transform': transforms.Compose([
-            transforms.RandomCrop(32, padding=4), 
-            transforms.RandomHorizontalFlip(), 
+            transforms.RandomCrop(32, padding=4),
+            transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2470, 0.2435, 0.2616))
@@ -192,8 +197,6 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': opts.batch_size, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
-        'optimizer': 'Adam',
-        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
     'FOOD200': {
         'num_class': 200,
@@ -211,8 +214,6 @@ args_pool = {
         ]),
         'loader_tr_args': {'batch_size': 256, 'num_workers': 0},
         'loader_te_args': {'batch_size': 1024, 'num_workers': 0},
-        'optimizer': 'Adam',
-        'optimizer_args': {'lr': 1e-3, 'weight_decay': 0},
     },
 }
 
@@ -231,7 +232,12 @@ else:
 X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path)
 handler = get_handler(opts.data)
 
-args['optimizer_args']['lr'] = opts.lr
+args['optimizer'] = opts.optimizer
+args['optimizer_args'] = {'lr': opts.lr, 'weight_decay': 0}
+args['scheduler'] = opts.scheduler
+
+args['max_epoch'] = 300
+args['max_acc'] = 0.99
 
 # start experiment
 n_pool = len(Y_tr)
@@ -283,8 +289,9 @@ print('Strategy:', type(strategy).__name__, flush=True)
 print('Query size:', NUM_QUERY, flush=True)
 print('---------------------------', flush=True)
 
-date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%f")
-writer = SummaryWriter(f'runs/{type(strategy).__name__}_{DATA_NAME}_{opts.model}{"_aug" if opts.aug else ""}_{opts.batch_size}_{date}')
+date = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+writer = SummaryWriter(
+    f'{opts.out}/{type(strategy).__name__}_{opts.data}_{opts.model}_{opts.optimizer}_{opts.scheduler}{"_aug" if opts.aug else ""}_{opts.batch_size}_{date}')
 
 # Evaluate initial accuracy (without training)
 P = strategy.predict(X_te)
@@ -307,11 +314,14 @@ set_seed(SEED)
 optimizer = strategy.setup_optimizer()
 
 set_seed(SEED)
+scheduler = strategy.setup_scheduler(optimizer)
+
+set_seed(SEED)
 dataloader = strategy.setup_data()
 
 set_seed(SEED)
 start = time.time()
-train_step = strategy.train(optimizer, dataloader)
+train_step = strategy.train(dataloader, optimizer, scheduler)
 train_t = time.time() - start
 
 # Evaluate
@@ -345,11 +355,14 @@ for rd in pbar:
     optimizer = strategy.setup_optimizer()
 
     set_seed(SEED)
+    scheduler = strategy.setup_scheduler(optimizer)
+
+    set_seed(SEED)
     dataloader = strategy.setup_data()
 
     set_seed(SEED + rd)
     start = time.time()
-    train_step = strategy.train(optimizer, dataloader)
+    train_step = strategy.train(dataloader, optimizer, scheduler)
     train_t = time.time() - start
 
     # Evaluate
