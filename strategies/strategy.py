@@ -33,24 +33,25 @@ class BaseStrategy:
     def update(self, idxs_lb):
         self.idxs_lb[idxs_lb] = True
 
-    def _train(self, clf, epoch, loader_tr, optimizer):
-        clf.train()
+    @torch.no_grad()
+    def _eval(self, epoch, loader_tr):
+        self.clf.eval()
+        accFinal = 0.
+        for batch_idx, (x, y, idxs) in enumerate(loader_tr):
+            x, y = Variable(x.cuda()), Variable(y.cuda())
+            out, e1 = self.clf(x)
+            accFinal += (torch.max(out, 1)[1] == y).sum().detach().item()
+        return accFinal / len(loader_tr.dataset.X)
+
+    def _train(self, epoch, loader_tr, optimizer):
+        self.clf.train()
         for batch_idx, (x, y, idxs) in enumerate(loader_tr):
             x, y = Variable(x.cuda()), Variable(y.cuda())
             optimizer.zero_grad()
-            out, e1 = clf(x)
+            out, e1 = self.clf(x)
             loss = F.cross_entropy(out, y)
             loss.backward()
             optimizer.step()
-
-        with torch.no_grad():
-            clf.eval()
-            accFinal = 0.
-            for batch_idx, (x, y, idxs) in enumerate(loader_tr):
-                x, y = Variable(x.cuda()), Variable(y.cuda())
-                out, e1 = clf(x)
-                accFinal += (torch.max(out, 1)[1] == y).sum().detach().item()
-        return accFinal / len(loader_tr.dataset.X)
 
     def setup_network(self):
         self.clf.load_state_dict(self.initial_state)
@@ -85,6 +86,10 @@ class BaseStrategy:
                     return False
         return True
 
+    def step_scheduler(self, scheduler):
+        if scheduler is not None:
+            scheduler.step()
+
     def train(self, dataloader, optimizer, scheduler):
         epoch = 0
         accCurrent = 0.
@@ -92,9 +97,9 @@ class BaseStrategy:
 
         saturated = False
         while accCurrent < self.args['max_acc'] and not saturated and epoch < self.args['max_epoch']:
-            accCurrent = self._train(self.clf, epoch, dataloader, optimizer)
-            if scheduler is not None:
-                scheduler.step()
+            self._train(epoch, dataloader, optimizer)
+            accCurrent = self._eval(epoch, dataloader)
+            self.step_scheduler(scheduler)
             print(f'Epoch {epoch}: {accCurrent}', flush=True)
             epoch += 1
             acc_monitor.append(accCurrent)
