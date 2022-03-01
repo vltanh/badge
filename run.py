@@ -11,7 +11,7 @@ import seaborn as sns
 
 from utils import set_deterministic, set_seed
 from models import ResNet18, VGG
-from models.mlp import VGG_10_clf, VGG_10_dis
+from models.mlp import MLPClassifier, MLPDiscriminator
 from datasets import get_dataset, get_handler
 from datasets.cifar10 import CIFAR10_Adversarial
 from strategies import *
@@ -114,7 +114,6 @@ DATA_NAME = opts.data
 
 args_pool = {
     'MNIST': {
-        'n_epoch': 10,
         'transform': transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))
@@ -127,7 +126,6 @@ args_pool = {
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
     },
     'FashionMNIST': {
-        'n_epoch': 10,
         'transform': transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))
@@ -140,7 +138,6 @@ args_pool = {
         'loader_te_args': {'batch_size': 1000, 'num_workers': 0},
     },
     'SVHN': {
-        'n_epoch': 20,
         'transform': transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.4377, 0.4438, 0.4728),
@@ -156,7 +153,6 @@ args_pool = {
     },
     'CIFAR10': {
         'num_class': 10,
-        'n_epoch': 3,
         'transform': transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
@@ -178,7 +174,6 @@ args_pool = {
     },
     'CIFAR100': {
         'num_class': 100,
-        'n_epoch': 3,
         'transform': transforms.Compose([
             transforms.RandomCrop(32, padding=4),
             transforms.RandomHorizontalFlip(),
@@ -212,8 +207,8 @@ args_pool = {
             transforms.Normalize((0.4914, 0.4822, 0.4465),
                                  (0.2470, 0.2435, 0.2616))
         ]),
-        'loader_tr_args': {'batch_size': 256, 'num_workers': 0},
-        'loader_te_args': {'batch_size': 1024, 'num_workers': 0},
+        'loader_tr_args': {'batch_size': opts.batch_size, 'num_workers': 0},
+        'loader_te_args': {'batch_size': 128, 'num_workers': 0},
     },
 }
 
@@ -233,7 +228,10 @@ X_tr, Y_tr, X_te, Y_te = get_dataset(DATA_NAME, opts.path)
 handler = get_handler(opts.data)
 
 args['optimizer'] = opts.optimizer
-args['optimizer_args'] = {'lr': opts.lr, 'weight_decay': 0}
+if opts.optimizer == 'sgd':
+    args['optimizer_args'] = {'lr': opts.lr, 'momentum': 0.9, 'weight_decay': 5e-4}
+else:
+    args['optimizer_args'] = {'lr': opts.lr, 'weight_decay': 0.0}
 args['scheduler'] = opts.scheduler
 
 args['max_epoch'] = 300
@@ -270,9 +268,11 @@ elif opts.alg == 'kmeans':
 elif opts.alg == 'waal':
     handler = CIFAR10_Adversarial, handler[1]
 
-    clf = VGG_10_clf()
+    clf = MLPClassifier(nclasses=args['num_class'])
     clf.fc.load_state_dict(net.classifier.state_dict())
-    net = net, VGG_10_clf(), VGG_10_dis()
+    net = net, clf, MLPDiscriminator()
+
+    args['alpha'] = 2e-3
 
     strategy = WassersteinAdversarial(X_tr, Y_tr, net, handler, args)
 elif opts.alg == 'albl':  # active learning by learning
