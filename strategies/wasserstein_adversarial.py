@@ -81,7 +81,7 @@ class WassersteinAdversarial(BaseStrategy):
                                              self.X[idx_ulb_train], self.Y[idx_ulb_train],
                                              transform=self.args['transform']),
                           shuffle=True, **self.args['loader_tr_args'])
-    
+
     def setup_optimizer(self):
         if self.args['optimizer'] == 'adam':
             opt = optim.Adam
@@ -95,7 +95,7 @@ class WassersteinAdversarial(BaseStrategy):
         opt_dis = opt(self.dis.parameters(),
                       **self.args['optimizer_args'])
         return opt_fea, opt_clf, opt_dis
-    
+
     def setup_scheduler(self, optimizer):
         if self.args['scheduler'] == 'none':
             scheduler = [None for opt in optimizer]
@@ -103,7 +103,7 @@ class WassersteinAdversarial(BaseStrategy):
             scheduler = [optim.lr_scheduler.CosineAnnealingLR(
                 opt, T_max=self.args['max_epoch']) for opt in optimizer]
         return scheduler
-    
+
     def _train(self, epoch, dataloader, optimizer):
         alpha = self.args['alpha']
 

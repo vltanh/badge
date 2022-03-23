@@ -13,5 +13,15 @@
 # Running an experiment
 
 ```
-python run.py --model resnet --nQuery 1000 --data CIFAR10 --alg rand
+python run.py \
+            --model resnet \
+            --optimizer sgd \
+            --scheduler cosine \
+            --lr 0.01 \
+            --nStart 1000 \
+            --nQuery 3000 \
+            --nEnd 25000 \
+            --batch_size 20 \
+            --data CIFAR10 \
+            --alg rand
 ```

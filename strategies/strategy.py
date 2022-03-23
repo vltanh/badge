@@ -23,6 +23,8 @@ class BaseStrategy:
         self.args = args
         self.n_pool = len(Y)
 
+        self.query_count = 0
+
     def init_query(self, n):
         inds = np.where(self.idxs_lb == 0)[0]
         return inds[np.random.permutation(len(inds))][:n]
@@ -135,6 +137,32 @@ class BaseStrategy:
                 probs[idxs] = prob.cpu().data
 
         return probs
+
+    def predict_prob_embed(self, X, eval=True):
+        loader_te = DataLoader(self.test_handler(X, transform=self.args['transformTest']),
+                               shuffle=False, **self.args['loader_te_args'])
+
+        probs = torch.zeros([len(X), self.clf.nclasses])
+        embeddings = torch.zeros([len(X), self.clf.get_embedding_dim()])
+        if eval:
+            self.clf.eval()
+            with torch.no_grad():
+                for x, idxs in loader_te:
+                    x = Variable(x.cuda())
+                    out, e1 = self.clf(x)
+                    prob = F.softmax(out, dim=1)
+                    probs[idxs] = prob.cpu()
+                    embeddings[idxs] = e1.cpu()
+        else:
+            self.clf.train()
+            for x, idxs in loader_te:
+                x = Variable(x.cuda())
+                out, e1 = self.clf(x)
+                prob = F.softmax(out, dim=1)
+                probs[idxs] = prob.cpu()
+                embeddings[idxs] = e1.cpu()
+
+        return probs, embeddings
 
     def predict_prob_dropout(self, X, Y, n_drop):
         loader_te = DataLoader(self.handler(X, Y, transform=self.args['transformTest']),
