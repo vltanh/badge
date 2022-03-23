@@ -15,3 +15,4 @@ from .active_learning_by_learning import ActiveLearningByLearning
 from .badge_sampling import BadgeSampling
 from .kdpp_sampling import kDPPSampling
 from .wasserstein_adversarial import WassersteinAdversarial
+from .alpha_mix_sampling import AlphaMixSampling

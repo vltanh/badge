@@ -229,7 +229,8 @@ handler = get_handler(opts.data)
 
 args['optimizer'] = opts.optimizer
 if opts.optimizer == 'sgd':
-    args['optimizer_args'] = {'lr': opts.lr, 'momentum': 0.9, 'weight_decay': 5e-4}
+    args['optimizer_args'] = {'lr': opts.lr,
+                              'momentum': 0.9, 'weight_decay': 5e-4}
 else:
     args['optimizer_args'] = {'lr': opts.lr, 'weight_decay': 0.0}
 args['scheduler'] = opts.scheduler
@@ -275,6 +276,11 @@ elif opts.alg == 'waal':
     args['alpha'] = 2e-3
 
     strategy = WassersteinAdversarial(X_tr, Y_tr, net, handler, args)
+elif opts.alg == 'alpha_mix':
+    args['alpha_closed_form_approx'] = False
+    args['alpha_cap'] = 0.03125
+    args['alpha_opt'] = False
+    strategy = AlphaMixSampling(X_tr, Y_tr, net, handler, args)
 elif opts.alg == 'albl':  # active learning by learning
     albl_list = [
         LeastConfidence(X_tr, Y_tr, net, handler, args),
